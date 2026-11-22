@@ -1,0 +1,26 @@
+spec:
+  inputs:
+    pr_number:
+      description: "GitHub pull request number in oka96/ocr-playground"
+      type: string
+      default: "1"
+      regex: '^[1-9][0-9]*$'
+---
+workflow:
+  name: "OCR review for GitHub PR #$[[ inputs.pr_number ]]"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true" && ($CI_PIPELINE_SOURCE == "web" || $CI_PIPELINE_SOURCE == "api")'
+
+stages:
+  - review
+
+ocr-review:
+  stage: review
+  image: node:22-bookworm
+  script:
+    - bash ci/review-pr.sh "$[[ inputs.pr_number ]]"
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - target/ocr-report.txt
