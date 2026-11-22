@@ -15,8 +15,12 @@ trap 'rm -rf -- "$workspace"' EXIT
 review_repo="$workspace/repo"
 background_file="$workspace/pr-context.md"
 
+api_headers=(--header 'Accept: application/vnd.github+json')
+if [[ -n "${GH_TOKEN:-}" ]]; then
+    api_headers+=(--header "Authorization: Bearer $GH_TOKEN")
+fi
 commits=$(curl --fail --silent --show-error --retry 2 \
-    --header 'Accept: application/vnd.github+json' \
+    "${api_headers[@]}" \
     "https://api.github.com/repos/${repo_slug}/pulls/${pr_number}" |
     node -e '
         const fs = require("node:fs");
@@ -48,4 +52,3 @@ npx --yes --package=@alibaba-group/open-code-review@1.14.0 ocr review \
     --audience agent --format text \
     --background-file "$background_file" \
     --output "$report"
-cat "$report"

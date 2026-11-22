@@ -1,0 +1,57 @@
+name: OCR Pull Request Review
+run-name: 'OCR review for PR #${{ inputs.pr_number }}'
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: GitHub pull request number
+        required: true
+        type: string
+        default: '1'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  ocr-review:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Review pull request
+        env:
+          PR_NUMBER: ${{ inputs.pr_number }}
+          GH_TOKEN: ${{ github.token }}
+          OCR_NO_UPDATE: '1'
+          OCR_LLM_URL: https://api.openai.com/v1/responses
+          OCR_LLM_PROTOCOL: openai-responses
+          OCR_LLM_MODEL: ${{ vars.OCR_LLM_MODEL || 'gpt-6.2-sol' }}
+          OCR_LLM_TOKEN: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          if [[ -z "$OCR_LLM_TOKEN" ]]; then
+            echo '::error::The OPENAI_API_KEY repository secret is required for OCR.'
+            exit 1
+          fi
+          bash ci/review-pr.sh "$PR_NUMBER"
+          {
+            printf '### OCR report for PR #%s\n\n' "$PR_NUMBER"
+            sed 's/^/    /' target/ocr-report.txt
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload OCR report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ocr-pr-${{ inputs.pr_number }}-report
+          path: target/ocr-report.txt
+          if-no-files-found: error
+          retention-days: 7
